@@ -31,12 +31,27 @@ const biggestExpense = expenses.reduce<Expense | null>(
 );
 const today = new Date();
 
+// Monday = start of week
+const dayOfWeek = today.getDay();
+const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
 const startOfWeek = new Date(today);
-startOfWeek.setDate(today.getDate() - today.getDay());
+startOfWeek.setDate(today.getDate() - daysFromMonday);
+startOfWeek.setHours(0, 0, 0, 0);
+
+const endOfWeek = new Date(startOfWeek);
+endOfWeek.setDate(startOfWeek.getDate() + 7);
 
 const thisWeekExpenses = expenses.filter((expense) => {
-  const expenseDate = new Date(expense.date);
-  return expenseDate >= startOfWeek;
+  // Parse YYYY-MM-DD as a local date to avoid timezone issues
+  const [year, month, day] = expense.date.split("-").map(Number);
+
+  const expenseDate = new Date(year, month - 1, day);
+
+  return (
+    expenseDate >= startOfWeek &&
+    expenseDate < endOfWeek
+  );
 });
 
 const thisWeekSpent = thisWeekExpenses.reduce(
@@ -61,7 +76,10 @@ const thisWeekSpent = thisWeekExpenses.reduce(
 
         <div className="text-right">
           <p className="text-xs text-gray-400">
-            August 2026
+            {new Date().toLocaleDateString("en-US", {
+              month: "long",
+              year: "numeric",
+            })}
           </p>
 
           <p className="mt-1 text-sm font-medium text-gray-700">

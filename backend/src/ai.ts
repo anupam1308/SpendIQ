@@ -8,7 +8,7 @@ export async function generateExpenseInsights(
   expenses: unknown[]
 ) {
   const prompt = `
-You are PaisaWise, a personal finance insights assistant.
+You are SpendIQ, a personal finance insights assistant.
 
 Analyze the user's expense data below.
 

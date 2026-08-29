@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   BrowserRouter,
+  Navigate,
   Routes,
   Route,
 } from "react-router-dom";
@@ -11,55 +12,173 @@ import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Expenses from "./pages/Expenses";
 import Insights from "./pages/Insights";
+import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
+
+import { supabase } from "./lib/supabase";
 
 import type { Expense } from "./types/expense";
 
 const API_URL = "http://localhost:5000/api/expenses";
 
+/*
+|--------------------------------------------------------------------------
+| Authentication headers
+|--------------------------------------------------------------------------
+*/
+
+const getAuthHeaders = async () => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    throw new Error("User is not logged in");
+  }
+
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session.access_token}`,
+  };
+};
+
+/*
+|--------------------------------------------------------------------------
+| App
+|--------------------------------------------------------------------------
+*/
+
 function App() {
+  /*
+  |--------------------------------------------------------------------------
+  | Authentication state
+  |--------------------------------------------------------------------------
+  */
+
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Expenses state
+  |--------------------------------------------------------------------------
+  */
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load expenses from backend
+  /*
+  |--------------------------------------------------------------------------
+  | Check authentication
+  |--------------------------------------------------------------------------
+  */
+
   useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("Failed to get session:", error);
+        }
+
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error("Authentication check failed:", error);
+        setUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkUser();
+
+    /*
+    | Listen for login/logout changes
+    */
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Load user's expenses
+  |--------------------------------------------------------------------------
+  */
+
+  useEffect(() => {
+    if (!user) {
+      setExpenses([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchExpenses = async () => {
       try {
-        const response = await fetch(API_URL);
+        setLoading(true);
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch expenses");
-        }
+        const headers = await getAuthHeaders();
+
+        const response = await fetch(API_URL, {
+          method: "GET",
+          headers,
+        });
 
         const data = await response.json();
 
-        setExpenses(data.expenses);
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Failed to fetch expenses"
+          );
+        }
+
+        setExpenses(data.expenses || []);
       } catch (error) {
         console.error("Failed to load expenses:", error);
+        setExpenses([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchExpenses();
-  }, []);
+  }, [user]);
 
-  // Add expense
+  /*
+  |--------------------------------------------------------------------------
+  | Add expense
+  |--------------------------------------------------------------------------
+  */
+
   const handleAddExpense = async (
     expense: Omit<Expense, "id">
   ) => {
     try {
+      const headers = await getAuthHeaders();
+
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(expense),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create expense");
+        throw new Error(
+          data.error || "Failed to create expense"
+        );
       }
 
       setExpenses((currentExpenses) => [
@@ -71,20 +190,30 @@ function App() {
     }
   };
 
-  // Delete expense
+  /*
+  |--------------------------------------------------------------------------
+  | Delete expense
+  |--------------------------------------------------------------------------
+  */
+
   const handleDeleteExpense = async (id: string) => {
     try {
+      const headers = await getAuthHeaders();
+
       const response = await fetch(
         `${API_URL}/${id}`,
         {
           method: "DELETE",
+          headers,
         }
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to delete expense");
+        throw new Error(
+          data.error || "Failed to delete expense"
+        );
       }
 
       setExpenses((currentExpenses) =>
@@ -93,11 +222,19 @@ function App() {
         )
       );
     } catch (error) {
-      console.error("Failed to delete expense:", error);
+      console.error(
+        "Failed to delete expense:",
+        error
+      );
     }
   };
 
-  // Edit expense
+  /*
+  |--------------------------------------------------------------------------
+  | Edit expense
+  |--------------------------------------------------------------------------
+  */
+
   const handleEditExpense = async (
     id: string,
     updatedExpense: Partial<Expense>
@@ -116,13 +253,13 @@ function App() {
         ...updatedExpense,
       };
 
+      const headers = await getAuthHeaders();
+
       const response = await fetch(
         `${API_URL}/${id}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({
             amount: expenseToUpdate.amount,
             category: expenseToUpdate.category,
@@ -136,7 +273,9 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to update expense");
+        throw new Error(
+          data.error || "Failed to update expense"
+        );
       }
 
       setExpenses((currentExpenses) =>
@@ -147,61 +286,145 @@ function App() {
         )
       );
     } catch (error) {
-      console.error("Failed to update expense:", error);
+      console.error(
+        "Failed to update expense:",
+        error
+      );
     }
   };
 
-  if (loading) {
+  /*
+  |--------------------------------------------------------------------------
+  | Authentication loading
+  |--------------------------------------------------------------------------
+  */
+
+  if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f7f5]">
         <p className="text-sm text-gray-500">
-          Loading expenses...
+          Checking authentication...
         </p>
       </div>
     );
   }
 
+  /*
+  |--------------------------------------------------------------------------
+  | Application
+  |--------------------------------------------------------------------------
+  */
+
   return (
     <BrowserRouter>
-      <div className="min-h-screen flex bg-[#f7f7f5]">
+      <Routes>
 
-        <Sidebar />
+        {/* Login */}
 
-        <Routes>
-
-          <Route
-            path="/"
-            element={
-              <Dashboard
-                expenses={expenses}
-                onAddExpense={handleAddExpense}
+        <Route
+          path="/login"
+          element={
+            user ? (
+              <Navigate
+                to="/"
+                replace
               />
-            }
-          />
+            ) : (
+              <Login />
+            )
+          }
+        />
 
-          <Route
-            path="/expenses"
-            element={
-              <Expenses
-                expenses={expenses}
-                onDeleteExpense={handleDeleteExpense}
-                onEditExpense={handleEditExpense}
+        {/* Reset Password */}
+        <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Protected application */}
+
+        <Route
+          path="*"
+          element={
+            user ? (
+              <div className="min-h-screen flex bg-[#f7f7f5]">
+
+                <Sidebar />
+
+                <main className="flex-1">
+
+                  <Routes>
+
+                    {/* Dashboard */}
+
+                    <Route
+                      path="/"
+                      element={
+                        loading ? (
+                          <div className="flex-1 min-h-screen flex items-center justify-center">
+                            <p className="text-sm text-gray-500">
+                              Loading expenses...
+                            </p>
+                          </div>
+                        ) : (
+                          <Dashboard
+                            expenses={expenses}
+                            onAddExpense={
+                              handleAddExpense
+                            }
+                          />
+                        )
+                      }
+                    />
+
+                    {/* Expenses */}
+
+                    <Route
+                      path="/expenses"
+                      element={
+                        loading ? (
+                          <div className="flex-1 min-h-screen flex items-center justify-center">
+                            <p className="text-sm text-gray-500">
+                              Loading expenses...
+                            </p>
+                          </div>
+                        ) : (
+                          <Expenses
+                            expenses={expenses}
+                            onDeleteExpense={
+                              handleDeleteExpense
+                            }
+                            onEditExpense={
+                              handleEditExpense
+                            }
+                          />
+                        )
+                      }
+                    />
+
+                    {/* Insights */}
+
+                    <Route
+                      path="/insights"
+                      element={
+                        <Insights
+                          expenses={expenses}
+                        />
+                      }
+                    />
+
+                  </Routes>
+
+                </main>
+
+              </div>
+            ) : (
+              <Navigate
+                to="/login"
+                replace
               />
-            }
-          />
+            )
+          }
+        />
 
-         <Route
-  path="/insights"
-  element={
-    <Insights
-      expenses={expenses}
-    />
-  }
-/>
-
-        </Routes>
-
-      </div>
+      </Routes>
     </BrowserRouter>
   );
 }

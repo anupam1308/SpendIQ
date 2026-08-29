@@ -1,39 +1,33 @@
-import express from "express";
+import express, { Response } from "express";
 import cors from "cors";
+
 import { supabase } from "./supabase";
 import { generateExpenseInsights } from "./ai";
+import { requireAuth, AuthRequest } from "./auth";
 
 const app = express();
+
+
+// ---------------------------------------------------------
+// Middleware
+// ---------------------------------------------------------
+
+const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: allowedOrigin,
   })
 );
 
 app.use(express.json());
-app.use(express.json());
-
-app.get("/api/test-db", async (_req, res) => {
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("*")
-    .limit(5);
-
-  if (error) {
-    console.error("Database error:", error);
-    return res.status(500).json({
-      error: error.message,
-    });
-  }
-
-  res.json({
-    message: "Database connection successful",
-    expenses: data,
-  });
-});
 
 const PORT = 5000;
 
+
+// ---------------------------------------------------------
+// Types
+// ---------------------------------------------------------
 
 interface Expense {
   id: string;
@@ -42,9 +36,13 @@ interface Expense {
   merchant: string;
   note: string;
   date: string;
+  user_id: string;
 }
 
 
+// ---------------------------------------------------------
+// Allowed categories
+// ---------------------------------------------------------
 
 const allowedCategories = [
   "Food",
@@ -56,245 +54,427 @@ const allowedCategories = [
   "Other",
 ];
 
-app.get("/", (req, res) => {
+
+// ---------------------------------------------------------
+// Public route
+// ---------------------------------------------------------
+
+app.get("/", (_req, res) => {
   res.json({
-    message: "PaisaWise backend is running!",
+    message: "SpendIQ backend is running!",
   });
 });
 
-app.get("/api/expenses", async (_req, res) => {
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("*")
-    .order("date", { ascending: false });
 
-  if (error) {
-    console.error("Supabase fetch error:", error);
+// ---------------------------------------------------------
+// Protected Expense Routes
+// ---------------------------------------------------------
 
-    return res.status(500).json({
-      error: "Failed to fetch expenses",
-    });
-  }
 
-  return res.status(200).json({
-    expenses: data,
-  });
-});
+// GET user's expenses
+app.get(
+  "/api/expenses",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
 
-app.post("/api/expenses", async (req, res) => {
-  const { amount, category, merchant, note, date } = req.body;
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false });
 
-  // Validate amount
-  if (typeof amount !== "number" || amount <= 0) {
-    return res.status(400).json({
-      error: "Amount must be a positive number",
-    });
-  }
+      if (error) {
+        console.error("Supabase fetch error:", error);
 
-  // Validate category
-  if (
-    typeof category !== "string" ||
-    !allowedCategories.includes(category)
-  ) {
-    return res.status(400).json({
-      error: "Invalid expense category",
-    });
-  }
+        return res.status(500).json({
+          error: "Failed to fetch expenses",
+        });
+      }
 
-  // Validate merchant
-  if (
-    typeof merchant !== "string" ||
-    !merchant.trim()
-  ) {
-    return res.status(400).json({
-      error: "Merchant is required",
-    });
-  }
-
-  // Create expense object
-  const newExpense: Expense = {
-    id: `exp_${Date.now()}`,
-    amount,
-    category,
-    merchant: merchant.trim(),
-    note: typeof note === "string" ? note.trim() : "",
-    date:
-      typeof date === "string" && date
-        ? date
-        : new Date().toISOString().split("T")[0],
-  };
-
-  // Save expense to Supabase
-  const { data, error } = await supabase
-    .from("expenses")
-    .insert(newExpense)
-    .select()
-    .single();
-
-  // Handle database error
-  if (error) {
-    console.error("Supabase insert error:", error);
-
-    return res.status(500).json({
-      error: "Failed to create expense",
-    });
-  }
-
-  // Success
-  return res.status(201).json({
-    message: "Expense created successfully",
-    expense: data,
-  });
-});
-
-app.put("/api/expenses/:id", async (req, res) => {
-  const { id } = req.params;
-  const { amount, category, merchant, note, date } = req.body;
-
-  // Validate amount
-  if (typeof amount !== "number" || amount <= 0) {
-    return res.status(400).json({
-      error: "Amount must be a positive number",
-    });
-  }
-
-  // Validate category
-  if (
-    typeof category !== "string" ||
-    !allowedCategories.includes(category)
-  ) {
-    return res.status(400).json({
-      error: "Invalid expense category",
-    });
-  }
-
-  // Validate merchant
-  if (
-    typeof merchant !== "string" ||
-    !merchant.trim()
-  ) {
-    return res.status(400).json({
-      error: "Merchant is required",
-    });
-  }
-
-  // Update expense in Supabase
-  const { data, error } = await supabase
-    .from("expenses")
-    .update({
-      amount,
-      category,
-      merchant: merchant.trim(),
-      note: typeof note === "string" ? note.trim() : "",
-      date:
-        typeof date === "string" && date
-          ? date
-          : new Date().toISOString().split("T")[0],
-    })
-    .eq("id", id)
-    .select()
-    .single();
-
-  // Handle database errors
-  if (error) {
-    console.error("Supabase update error:", error);
-
-    // Expense doesn't exist
-    if (error.code === "PGRST116") {
-      return res.status(404).json({
-        error: "Expense not found",
+      return res.status(200).json({
+        expenses: data,
       });
-    }
-
-    return res.status(500).json({
-      error: "Failed to update expense",
-    });
-  }
-
-  return res.status(200).json({
-    message: "Expense updated successfully",
-    expense: data,
-  });
-});
-
-app.delete("/api/expenses/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const { data, error } = await supabase
-      .from("expenses")
-      .delete()
-      .eq("id", id)
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      console.error("Supabase delete error:", error);
+    } catch (error) {
+      console.error("Fetch expenses error:", error);
 
       return res.status(500).json({
-        error: "Failed to delete expense",
+        error: "Internal server error",
       });
     }
-
-    if (!data) {
-      return res.status(404).json({
-        error: "Expense not found",
-      });
-    }
-
-    return res.json({
-      message: "Expense deleted successfully",
-      expense: data,
-    });
-  } catch (error) {
-    console.error("Delete expense error:", error);
-
-    return res.status(500).json({
-      error: "Internal server error",
-    });
   }
-});
+);
 
-app.post("/api/insights", async (_req, res) => {
-  try {
-    // Get real expenses from Supabase
-    const { data, error } = await supabase
-      .from("expenses")
-      .select("*")
-      .order("date", { ascending: false });
 
-    if (error) {
+// POST create expense
+app.post(
+  "/api/expenses",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+
+      const {
+        amount,
+        category,
+        merchant,
+        note,
+        date,
+      } = req.body;
+
+
+      // Validate amount
+      if (
+        typeof amount !== "number" ||
+        amount <= 0
+      ) {
+        return res.status(400).json({
+          error: "Amount must be a positive number",
+        });
+      }
+
+
+      // Validate category
+      if (
+        typeof category !== "string" ||
+        !allowedCategories.includes(category)
+      ) {
+        return res.status(400).json({
+          error: "Invalid expense category",
+        });
+      }
+
+
+      // Validate merchant
+      if (
+        typeof merchant !== "string" ||
+        !merchant.trim()
+      ) {
+        return res.status(400).json({
+          error: "Merchant is required",
+        });
+      }
+
+
+      // Create expense
+      const newExpense: Expense = {
+        id: `exp_${Date.now()}`,
+
+        amount,
+
+        category,
+
+        merchant: merchant.trim(),
+
+        note:
+          typeof note === "string"
+            ? note.trim()
+            : "",
+
+        date:
+          typeof date === "string" && date
+            ? date
+            : new Date()
+                .toISOString()
+                .split("T")[0],
+
+        // IMPORTANT:
+        // User ID comes from authenticated user,
+        // NOT from frontend request body.
+        user_id: userId,
+      };
+
+
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from("expenses")
+        .insert(newExpense)
+        .select()
+        .single();
+
+
+      if (error) {
+        console.error(
+          "Supabase insert error:",
+          error
+        );
+
+        return res.status(500).json({
+          error: "Failed to create expense",
+        });
+      }
+
+
+      return res.status(201).json({
+        message: "Expense created successfully",
+        expense: data,
+      });
+
+    } catch (error) {
       console.error(
-        "Supabase insights fetch error:",
+        "Create expense error:",
         error
       );
 
       return res.status(500).json({
-        error: "Failed to fetch expenses for insights",
+        error: "Internal server error",
       });
     }
-
-    if (!data || data.length === 0) {
-      return res.status(400).json({
-        error: "No expenses available for analysis",
-      });
-    }
-
-    // Send real expense data to Gemini
-    const insights = await generateExpenseInsights(data);
-
-    return res.status(200).json({
-      insights,
-    });
-  } catch (error) {
-    console.error("AI insights error:", error);
-
-    return res.status(500).json({
-      error: "Failed to generate AI insights",
-    });
   }
-});
+);
+
+
+// PUT update expense
+app.put(
+  "/api/expenses/:id",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+
+      const { id } = req.params;
+
+      const {
+        amount,
+        category,
+        merchant,
+        note,
+        date,
+      } = req.body;
+
+
+      // Validate amount
+      if (
+        typeof amount !== "number" ||
+        amount <= 0
+      ) {
+        return res.status(400).json({
+          error: "Amount must be a positive number",
+        });
+      }
+
+
+      // Validate category
+      if (
+        typeof category !== "string" ||
+        !allowedCategories.includes(category)
+      ) {
+        return res.status(400).json({
+          error: "Invalid expense category",
+        });
+      }
+
+
+      // Validate merchant
+      if (
+        typeof merchant !== "string" ||
+        !merchant.trim()
+      ) {
+        return res.status(400).json({
+          error: "Merchant is required",
+        });
+      }
+
+
+      // Update only if expense belongs
+      // to the authenticated user
+      const { data, error } = await supabase
+        .from("expenses")
+        .update({
+          amount,
+
+          category,
+
+          merchant: merchant.trim(),
+
+          note:
+            typeof note === "string"
+              ? note.trim()
+              : "",
+
+          date:
+            typeof date === "string" && date
+              ? date
+              : new Date()
+                  .toISOString()
+                  .split("T")[0],
+        })
+        .eq("id", id)
+        .eq("user_id", userId)
+        .select()
+        .maybeSingle();
+
+
+      if (error) {
+        console.error(
+          "Supabase update error:",
+          error
+        );
+
+        return res.status(500).json({
+          error: "Failed to update expense",
+        });
+      }
+
+
+      if (!data) {
+        return res.status(404).json({
+          error: "Expense not found",
+        });
+      }
+
+
+      return res.status(200).json({
+        message: "Expense updated successfully",
+        expense: data,
+      });
+
+    } catch (error) {
+      console.error(
+        "Update expense error:",
+        error
+      );
+
+      return res.status(500).json({
+        error: "Internal server error",
+      });
+    }
+  }
+);
+
+
+// DELETE expense
+app.delete(
+  "/api/expenses/:id",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+
+      const { id } = req.params;
+
+
+      // Delete only if expense belongs
+      // to authenticated user
+      const { data, error } = await supabase
+        .from("expenses")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId)
+        .select()
+        .maybeSingle();
+
+
+      if (error) {
+        console.error(
+          "Supabase delete error:",
+          error
+        );
+
+        return res.status(500).json({
+          error: "Failed to delete expense",
+        });
+      }
+
+
+      if (!data) {
+        return res.status(404).json({
+          error: "Expense not found",
+        });
+      }
+
+
+      return res.status(200).json({
+        message: "Expense deleted successfully",
+        expense: data,
+      });
+
+    } catch (error) {
+      console.error(
+        "Delete expense error:",
+        error
+      );
+
+      return res.status(500).json({
+        error: "Internal server error",
+      });
+    }
+  }
+);
+
+
+// ---------------------------------------------------------
+// AI Insights
+// ---------------------------------------------------------
+
+app.post(
+  "/api/insights",
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+
+
+      // Only fetch this user's expenses
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false });
+
+
+      if (error) {
+        console.error(
+          "Supabase insights fetch error:",
+          error
+        );
+
+        return res.status(500).json({
+          error:
+            "Failed to fetch expenses for insights",
+        });
+      }
+
+
+      if (!data || data.length === 0) {
+        return res.status(400).json({
+          error:
+            "No expenses available for analysis",
+        });
+      }
+
+
+      // Send only this user's expenses to Gemini
+      const insights =
+        await generateExpenseInsights(data);
+
+
+      return res.status(200).json({
+        insights,
+      });
+
+    } catch (error) {
+      console.error(
+        "AI insights error:",
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to generate AI insights",
+      });
+    }
+  }
+);
+
+
+// ---------------------------------------------------------
+// Start server
+// ---------------------------------------------------------
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(
+    `Server running on http://localhost:${PORT}`
+  );
 });
