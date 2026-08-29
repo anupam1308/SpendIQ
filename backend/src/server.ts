@@ -1,9 +1,9 @@
 import express, { Response } from "express";
 import cors from "cors";
 
-import { supabase } from "./supabase";
-import { generateExpenseInsights } from "./ai";
-import { requireAuth, AuthRequest } from "./auth";
+import { supabase } from "./supabase.js";
+import { generateExpenseInsights } from "./ai.js";
+import { requireAuth, AuthRequest } from "./auth.js";
 
 const app = express();
 
