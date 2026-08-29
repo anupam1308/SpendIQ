@@ -72,10 +72,10 @@ function Insights({ expenses }: InsightsProps) {
       }
 
 
-      // Call protected backend API
-      const response = await fetch(
-        "http://localhost:5000/api/insights",
-        {
+      const baseUrl = import.meta.env.VITE_API_URL || "https://spendiq-8wld.onrender.com";
+      const insightsUrl = `${baseUrl.replace(/\/$/, "")}/api/insights`;
+
+      const response = await fetch(insightsUrl, {
           method: "POST",
 
           headers: {

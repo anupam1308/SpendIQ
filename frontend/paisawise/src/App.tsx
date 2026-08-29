@@ -20,7 +20,8 @@ import { supabase } from "./lib/supabase";
 
 import type { Expense } from "./types/expense";
 
-const API_URL = "http://localhost:5000/api/expenses";
+const BASE_API_URL = import.meta.env.VITE_API_URL || "https://spendiq-8wld.onrender.com";
+const API_URL = `${BASE_API_URL.replace(/\/$/, "")}/api/expenses`;
 
 /*
 |--------------------------------------------------------------------------
@@ -128,23 +129,36 @@ function App() {
     const fetchExpenses = async () => {
       try {
         setLoading(true);
+        let fetchedExpenses: Expense[] | null = null;
 
-        const headers = await getAuthHeaders();
+        try {
+          const headers = await getAuthHeaders();
+          const response = await fetch(API_URL, {
+            method: "GET",
+            headers,
+          });
 
-        const response = await fetch(API_URL, {
-          method: "GET",
-          headers,
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.error || "Failed to fetch expenses"
-          );
+          if (response.ok) {
+            const data = await response.json();
+            fetchedExpenses = data.expenses;
+          }
+        } catch (backendErr) {
+          console.warn("Backend API unreachable, trying Supabase direct fetch:", backendErr);
         }
 
-        setExpenses(data.expenses || []);
+        // Direct Supabase query if backend fails or is waking up
+        if (!fetchedExpenses) {
+          const { data, error } = await supabase
+            .from("expenses")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("date", { ascending: false });
+
+          if (error) throw error;
+          fetchedExpenses = data || [];
+        }
+
+        setExpenses(fetchedExpenses);
       } catch (error) {
         console.error("Failed to load expenses:", error);
         setExpenses([]);
@@ -162,30 +176,50 @@ function App() {
   |--------------------------------------------------------------------------
   */
 
-  const handleAddExpense = async (
-    expense: Omit<Expense, "id">
-  ) => {
+  const handleAddExpense = async (expense: Omit<Expense, "id">) => {
     try {
-      const headers = await getAuthHeaders();
+      let createdExpense: Expense | null = null;
 
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(expense),
-      });
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(expense),
+        });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Failed to create expense"
-        );
+        if (response.ok) {
+          const data = await response.json();
+          createdExpense = data.expense;
+        }
+      } catch (backendErr) {
+        console.warn("Backend API add error, trying Supabase direct insert:", backendErr);
       }
 
-      setExpenses((currentExpenses) => [
-        ...currentExpenses,
-        data.expense,
-      ]);
+      if (!createdExpense && user) {
+        const newExpenseData = {
+          id: `exp_${Date.now()}`,
+          amount: expense.amount,
+          category: expense.category,
+          merchant: expense.merchant,
+          note: expense.note || "",
+          date: expense.date || new Date().toISOString().split("T")[0],
+          user_id: user.id,
+        };
+
+        const { data, error } = await supabase
+          .from("expenses")
+          .insert(newExpenseData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        createdExpense = data;
+      }
+
+      if (createdExpense) {
+        setExpenses((currentExpenses) => [createdExpense!, ...currentExpenses]);
+      }
     } catch (error) {
       console.error("Failed to add expense:", error);
     }
@@ -199,34 +233,40 @@ function App() {
 
   const handleDeleteExpense = async (id: string) => {
     try {
-      const headers = await getAuthHeaders();
+      let success = false;
 
-      const response = await fetch(
-        `${API_URL}/${id}`,
-        {
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/${id}`, {
           method: "DELETE",
           headers,
+        });
+
+        if (response.ok) {
+          success = true;
         }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Failed to delete expense"
-        );
+      } catch (backendErr) {
+        console.warn("Backend API delete error, trying Supabase direct delete:", backendErr);
       }
 
-      setExpenses((currentExpenses) =>
-        currentExpenses.filter(
-          (expense) => expense.id !== id
-        )
-      );
+      if (!success && user) {
+        const { error } = await supabase
+          .from("expenses")
+          .delete()
+          .eq("id", id)
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+        success = true;
+      }
+
+      if (success) {
+        setExpenses((currentExpenses) =>
+          currentExpenses.filter((expense) => expense.id !== id)
+        );
+      }
     } catch (error) {
-      console.error(
-        "Failed to delete expense:",
-        error
-      );
+      console.error("Failed to delete expense:", error);
     }
   };
 
@@ -241,24 +281,15 @@ function App() {
     updatedExpense: Partial<Expense>
   ) => {
     try {
-      const existingExpense = expenses.find(
-        (expense) => expense.id === id
-      );
+      const existingExpense = expenses.find((expense) => expense.id === id);
+      if (!existingExpense) return;
 
-      if (!existingExpense) {
-        return;
-      }
+      const expenseToUpdate = { ...existingExpense, ...updatedExpense };
+      let updatedData: Expense | null = null;
 
-      const expenseToUpdate = {
-        ...existingExpense,
-        ...updatedExpense,
-      };
-
-      const headers = await getAuthHeaders();
-
-      const response = await fetch(
-        `${API_URL}/${id}`,
-        {
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/${id}`, {
           method: "PUT",
           headers,
           body: JSON.stringify({
@@ -268,29 +299,44 @@ function App() {
             note: expenseToUpdate.note,
             date: expenseToUpdate.date,
           }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          updatedData = data.expense;
         }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Failed to update expense"
-        );
+      } catch (backendErr) {
+        console.warn("Backend API edit error, trying Supabase direct update:", backendErr);
       }
 
-      setExpenses((currentExpenses) =>
-        currentExpenses.map((expense) =>
-          expense.id === id
-            ? data.expense
-            : expense
-        )
-      );
+      if (!updatedData && user) {
+        const { data, error } = await supabase
+          .from("expenses")
+          .update({
+            amount: expenseToUpdate.amount,
+            category: expenseToUpdate.category,
+            merchant: expenseToUpdate.merchant,
+            note: expenseToUpdate.note,
+            date: expenseToUpdate.date,
+          })
+          .eq("id", id)
+          .eq("user_id", user.id)
+          .select()
+          .maybeSingle();
+
+        if (error) throw error;
+        updatedData = data;
+      }
+
+      if (updatedData) {
+        setExpenses((currentExpenses) =>
+          currentExpenses.map((expense) =>
+            expense.id === id ? updatedData! : expense
+          )
+        );
+      }
     } catch (error) {
-      console.error(
-        "Failed to update expense:",
-        error
-      );
+      console.error("Failed to update expense:", error);
     }
   };
 
