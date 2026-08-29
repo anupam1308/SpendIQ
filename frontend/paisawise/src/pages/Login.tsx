@@ -289,7 +289,7 @@ function Login() {
         {/* ========================================================================= */}
         {/* LEFT PANEL: Clean Vector Line-Art Illustration & SpendIQ Branding        */}
         {/* ========================================================================= */}
-        <div className="hidden md:flex w-full md:w-[55%] bg-[#edf6f2] p-8 lg:p-12 flex-col justify-between relative overflow-hidden">
+        <div className="desktop-only w-full md:w-[55%] bg-[#edf6f2] p-8 lg:p-12 flex-col justify-between relative overflow-hidden">
           
           {/* Subtle Ambient Radial Glow */}
           <div className="absolute -top-24 -left-24 w-80 h-80 bg-[#245c4a]/8 rounded-full blur-3xl pointer-events-none" />
