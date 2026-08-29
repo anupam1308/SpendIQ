@@ -190,9 +190,13 @@ function App() {
             }
           />
 
-          <Route
+         <Route
   path="/insights"
-  element={<Insights expenses={expenses} />}
+  element={
+    <Insights
+      expenses={expenses}
+    />
+  }
 />
 
         </Routes>

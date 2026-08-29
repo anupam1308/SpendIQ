@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { supabase } from "./supabase";
+import { generateExpenseInsights } from "./ai";
 
 const app = express();
 app.use(
@@ -254,7 +255,45 @@ app.delete("/api/expenses/:id", async (req, res) => {
   }
 });
 
+app.post("/api/insights", async (_req, res) => {
+  try {
+    // Get real expenses from Supabase
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("*")
+      .order("date", { ascending: false });
 
+    if (error) {
+      console.error(
+        "Supabase insights fetch error:",
+        error
+      );
+
+      return res.status(500).json({
+        error: "Failed to fetch expenses for insights",
+      });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(400).json({
+        error: "No expenses available for analysis",
+      });
+    }
+
+    // Send real expense data to Gemini
+    const insights = await generateExpenseInsights(data);
+
+    return res.status(200).json({
+      insights,
+    });
+  } catch (error) {
+    console.error("AI insights error:", error);
+
+    return res.status(500).json({
+      error: "Failed to generate AI insights",
+    });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
