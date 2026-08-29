@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
+import { MobileHeader, MobileNav } from "./components/MobileNav";
 
 import Dashboard from "./pages/Dashboard";
 import Expenses from "./pages/Expenses";
@@ -344,11 +345,13 @@ function App() {
           path="*"
           element={
             user ? (
-              <div className="min-h-screen flex bg-[#f7f7f5]">
+              <div className="min-h-screen flex flex-col md:flex-row bg-[#f7f7f5] overflow-x-hidden">
+
+                <MobileHeader />
 
                 <Sidebar />
 
-                <main className="flex-1">
+                <main className="flex-1 min-w-0 pb-20 md:pb-0 overflow-x-hidden">
 
                   <Routes>
 
@@ -413,6 +416,8 @@ function App() {
                   </Routes>
 
                 </main>
+
+                <MobileNav />
 
               </div>
             ) : (

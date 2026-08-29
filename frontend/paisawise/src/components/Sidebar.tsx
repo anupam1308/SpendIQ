@@ -23,7 +23,7 @@ function Sidebar() {
   };
 
   return (
-    <aside className="w-[240px] h-screen sticky top-0 bg-white border-r border-[#e2efe8] px-4 py-6 flex flex-col justify-between shrink-0 shadow-xs">
+    <aside className="hidden md:flex w-[240px] h-screen sticky top-0 bg-white border-r border-[#e2efe8] px-4 py-6 flex-col justify-between shrink-0 shadow-xs">
       
       <div>
         {/* Brand & Logo Header */}

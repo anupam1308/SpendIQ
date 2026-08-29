@@ -125,37 +125,37 @@ function Insights({ expenses }: InsightsProps) {
 
 
   return (
-    <main className="flex-1 px-10 py-8">
+    <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto w-full">
 
       {/* Header */}
 
       <div>
 
-        <h2 className="text-2xl font-semibold text-gray-900">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
           AI Insights
         </h2>
 
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-xs sm:text-sm text-gray-500">
           Understand your spending and find ways to save.
         </p>
 
       </div>
 
 
-      {/* Month */}
+      {/* Month & Action */}
 
-      <div className="mt-8 flex items-center justify-between">
+      <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 
         <div>
 
-          <p className="text-sm font-medium text-gray-700">
+          <p className="text-sm font-semibold text-gray-700">
             {new Date().toLocaleDateString("en-US", {
               month: "long",
               year: "numeric",
             })}
           </p>
 
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-0.5 text-xs text-gray-400">
             Based on your actual expenses
           </p>
 
@@ -166,7 +166,7 @@ function Insights({ expenses }: InsightsProps) {
           type="button"
           onClick={generateInsights}
           disabled={loading}
-          className="px-4 py-2 rounded-lg bg-[#245c4a] text-white text-sm font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#245c4a] text-white text-xs sm:text-sm font-semibold hover:opacity-90 active:scale-98 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-xs"
         >
           {loading
             ? "Generating..."

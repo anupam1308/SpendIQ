@@ -60,21 +60,21 @@ const thisWeekSpent = thisWeekExpenses.reduce(
 );
 
   return (
-    <main className="flex-1 px-10 py-8">
+    <main className="flex-1 px-4 sm:px-8 py-6 sm:py-8 max-w-7xl mx-auto w-full">
 
       {/* Header */}
-      <header className="flex items-start justify-between">
+      <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
             Good morning
           </h2>
 
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-xs sm:text-sm text-gray-500">
             Here's what's happening with your money.
           </p>
         </div>
 
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <p className="text-xs text-gray-400">
             {new Date().toLocaleDateString("en-US", {
               month: "long",
@@ -82,7 +82,7 @@ const thisWeekSpent = thisWeekExpenses.reduce(
             })}
           </p>
 
-          <p className="mt-1 text-sm font-medium text-gray-700">
+          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-semibold text-gray-700">
             ₹{totalSpent.toLocaleString("en-IN")} spent
           </p>
         </div>
@@ -94,15 +94,15 @@ const thisWeekSpent = thisWeekExpenses.reduce(
 
 
       {/* Summary Cards */}
-      <section className="mt-8 grid grid-cols-3 gap-5">
+      <section className="mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
 
         {/* Total Spent */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <p className="text-sm text-gray-500">
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
+          <p className="text-xs sm:text-sm text-gray-500 font-medium">
             Total spent
           </p>
 
-          <p className="mt-3 text-2xl font-semibold text-gray-900">
+          <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-gray-900">
             ₹{totalSpent.toLocaleString("en-IN")}
           </p>
 
@@ -113,54 +113,52 @@ const thisWeekSpent = thisWeekExpenses.reduce(
 
 
         {/* This Week */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <p className="text-sm text-gray-500">
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
+          <p className="text-xs sm:text-sm text-gray-500 font-medium">
             This week
           </p>
 
-          <p className="mt-3 text-2xl font-semibold text-gray-900">
-  ₹{thisWeekSpent.toLocaleString("en-IN")}
-</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-gray-900">
+            ₹{thisWeekSpent.toLocaleString("en-IN")}
+          </p>
 
-<p className="mt-1 text-xs text-gray-400">
-  {thisWeekExpenses.length} expenses
-</p>
+          <p className="mt-1 text-xs text-gray-400">
+            {thisWeekExpenses.length} expenses
+          </p>
         </div>
 
 
         {/* Biggest Expense */}
-<div className="bg-white border border-gray-200 rounded-xl p-5">
-  <p className="text-sm text-gray-500">
-    Biggest expense
-  </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs sm:col-span-2 lg:col-span-1">
+          <p className="text-xs sm:text-sm text-gray-500 font-medium">
+            Biggest expense
+          </p>
 
-  {biggestExpense ? (
-    <>
-      <p className="mt-3 text-2xl font-semibold text-gray-900">
-        ₹{biggestExpense.amount.toLocaleString("en-IN")}
-      </p>
+          {biggestExpense ? (
+            <>
+              <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-gray-900">
+                ₹{biggestExpense.amount.toLocaleString("en-IN")}
+              </p>
 
-      <p className="mt-1 text-xs text-gray-400">
-        {biggestExpense.merchant} · {biggestExpense.category}
-      </p>
-    </>
-  ) : (
-    <p className="mt-3 text-sm text-gray-400">
-      No expenses yet
-    </p>
-  )}
-</div>
-
-    
+              <p className="mt-1 text-xs text-gray-400 truncate">
+                {biggestExpense.merchant} · {biggestExpense.category}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 sm:mt-3 text-sm text-gray-400">
+              No expenses yet
+            </p>
+          )}
+        </div>
 
       </section>
 
 
       {/* Charts */}
-      <section className="mt-6 grid grid-cols-2 gap-5">
-  <WeeklySpending expenses={expenses} />
-  <CategorySpending expenses={expenses} />
-</section>
+      <section className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+        <WeeklySpending expenses={expenses} />
+        <CategorySpending expenses={expenses} />
+      </section>
 
 
       {/* Recent Expenses */}
