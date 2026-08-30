@@ -25,7 +25,6 @@ const COLORS = [
 function CategorySpending({
   expenses,
 }: CategorySpendingProps) {
-
   // Calculate total spending for each category
   const categoryTotals = expenses.reduce<Record<string, number>>(
     (totals, expense) => {
@@ -46,22 +45,22 @@ function CategorySpending({
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
-
-      <div className="mb-4">
-        <h3 className="text-base font-medium text-gray-900">
+    <div className="w-full min-w-0 overflow-hidden bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+      {/* Header */}
+      <div className="mb-4 min-w-0">
+        <h3 className="text-base font-medium text-gray-900 truncate">
           Spending by category
         </h3>
 
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-1 text-xs sm:text-sm text-gray-400">
           Where your money is going
         </p>
       </div>
 
-      <div className="h-[280px]">
-
+      {/* Chart */}
+      <div className="w-full min-w-0 h-[220px] sm:h-[260px] lg:h-[280px]">
         {data.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full w-full flex items-center justify-center">
             <p className="text-sm text-gray-400">
               No expenses yet
             </p>
@@ -69,15 +68,14 @@ function CategorySpending({
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-
               <Pie
                 data={data}
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                innerRadius={65}
-                outerRadius={95}
+                innerRadius="28%"
+                outerRadius="42%"
                 paddingAngle={2}
               >
                 {data.map((_, index) => (
@@ -88,14 +86,20 @@ function CategorySpending({
                 ))}
               </Pie>
 
-              <Tooltip />
-
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#ffffff",
+                  borderColor: "#e2efe8",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         )}
-
       </div>
-
     </div>
   );
 }

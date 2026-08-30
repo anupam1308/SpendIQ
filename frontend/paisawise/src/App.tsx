@@ -20,8 +20,14 @@ import { supabase } from "./lib/supabase";
 
 import type { Expense } from "./types/expense";
 
-const BASE_API_URL = import.meta.env.VITE_API_URL || "https://spendiq-8wld.onrender.com";
-const API_URL = `${BASE_API_URL.replace(/\/$/, "")}/api/expenses`;
+const BASE_API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://spendiq-8wld.onrender.com";
+
+const API_URL = `${BASE_API_URL.replace(
+  /\/$/,
+  ""
+)}/api/expenses`;
 
 /*
 |--------------------------------------------------------------------------
@@ -84,12 +90,19 @@ function App() {
         } = await supabase.auth.getSession();
 
         if (error) {
-          console.error("Failed to get session:", error);
+          console.error(
+            "Failed to get session:",
+            error
+          );
         }
 
         setUser(session?.user ?? null);
       } catch (error) {
-        console.error("Authentication check failed:", error);
+        console.error(
+          "Authentication check failed:",
+          error
+        );
+
         setUser(null);
       } finally {
         setAuthLoading(false);
@@ -99,14 +112,18 @@ function App() {
     checkUser();
 
     /*
+    |--------------------------------------------------------------------------
     | Listen for login/logout changes
+    |--------------------------------------------------------------------------
     */
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
 
     return () => {
       subscription.unsubscribe();
@@ -129,10 +146,13 @@ function App() {
     const fetchExpenses = async () => {
       try {
         setLoading(true);
-        let fetchedExpenses: Expense[] | null = null;
+
+        let fetchedExpenses: Expense[] | null =
+          null;
 
         try {
           const headers = await getAuthHeaders();
+
           const response = await fetch(API_URL, {
             method: "GET",
             headers,
@@ -143,24 +163,41 @@ function App() {
             fetchedExpenses = data.expenses;
           }
         } catch (backendErr) {
-          console.warn("Backend API unreachable, trying Supabase direct fetch:", backendErr);
+          console.warn(
+            "Backend API unreachable, trying Supabase direct fetch:",
+            backendErr
+          );
         }
 
-        // Direct Supabase query if backend fails or is waking up
+        /*
+        |--------------------------------------------------------------------------
+        | Direct Supabase query if backend fails
+        |--------------------------------------------------------------------------
+        */
+
         if (!fetchedExpenses) {
           const { data, error } = await supabase
             .from("expenses")
             .select("*")
             .eq("user_id", user.id)
-            .order("date", { ascending: false });
+            .order("date", {
+              ascending: false,
+            });
 
-          if (error) throw error;
+          if (error) {
+            throw error;
+          }
+
           fetchedExpenses = data || [];
         }
 
         setExpenses(fetchedExpenses);
       } catch (error) {
-        console.error("Failed to load expenses:", error);
+        console.error(
+          "Failed to load expenses:",
+          error
+        );
+
         setExpenses([]);
       } finally {
         setLoading(false);
@@ -176,12 +213,16 @@ function App() {
   |--------------------------------------------------------------------------
   */
 
-  const handleAddExpense = async (expense: Omit<Expense, "id">) => {
+  const handleAddExpense = async (
+    expense: Omit<Expense, "id">
+  ) => {
     try {
-      let createdExpense: Expense | null = null;
+      let createdExpense: Expense | null =
+        null;
 
       try {
         const headers = await getAuthHeaders();
+
         const response = await fetch(API_URL, {
           method: "POST",
           headers,
@@ -193,8 +234,17 @@ function App() {
           createdExpense = data.expense;
         }
       } catch (backendErr) {
-        console.warn("Backend API add error, trying Supabase direct insert:", backendErr);
+        console.warn(
+          "Backend API add error, trying Supabase direct insert:",
+          backendErr
+        );
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Supabase fallback
+      |--------------------------------------------------------------------------
+      */
 
       if (!createdExpense && user) {
         const newExpenseData = {
@@ -203,7 +253,11 @@ function App() {
           category: expense.category,
           merchant: expense.merchant,
           note: expense.note || "",
-          date: expense.date || new Date().toISOString().split("T")[0],
+          date:
+            expense.date ||
+            new Date()
+              .toISOString()
+              .split("T")[0],
           user_id: user.id,
         };
 
@@ -213,15 +267,26 @@ function App() {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
+
         createdExpense = data;
       }
 
       if (createdExpense) {
-        setExpenses((currentExpenses) => [createdExpense!, ...currentExpenses]);
+        setExpenses(
+          (currentExpenses) => [
+            createdExpense!,
+            ...currentExpenses,
+          ]
+        );
       }
     } catch (error) {
-      console.error("Failed to add expense:", error);
+      console.error(
+        "Failed to add expense:",
+        error
+      );
     }
   };
 
@@ -231,23 +296,38 @@ function App() {
   |--------------------------------------------------------------------------
   */
 
-  const handleDeleteExpense = async (id: string) => {
+  const handleDeleteExpense = async (
+    id: string
+  ) => {
     try {
       let success = false;
 
       try {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_URL}/${id}`, {
-          method: "DELETE",
-          headers,
-        });
+
+        const response = await fetch(
+          `${API_URL}/${id}`,
+          {
+            method: "DELETE",
+            headers,
+          }
+        );
 
         if (response.ok) {
           success = true;
         }
       } catch (backendErr) {
-        console.warn("Backend API delete error, trying Supabase direct delete:", backendErr);
+        console.warn(
+          "Backend API delete error, trying Supabase direct delete:",
+          backendErr
+        );
       }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Supabase fallback
+      |--------------------------------------------------------------------------
+      */
 
       if (!success && user) {
         const { error } = await supabase
@@ -256,17 +336,27 @@ function App() {
           .eq("id", id)
           .eq("user_id", user.id);
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
+
         success = true;
       }
 
       if (success) {
-        setExpenses((currentExpenses) =>
-          currentExpenses.filter((expense) => expense.id !== id)
+        setExpenses(
+          (currentExpenses) =>
+            currentExpenses.filter(
+              (expense) =>
+                expense.id !== id
+            )
         );
       }
     } catch (error) {
-      console.error("Failed to delete expense:", error);
+      console.error(
+        "Failed to delete expense:",
+        error
+      );
     }
   };
 
@@ -281,62 +371,107 @@ function App() {
     updatedExpense: Partial<Expense>
   ) => {
     try {
-      const existingExpense = expenses.find((expense) => expense.id === id);
-      if (!existingExpense) return;
+      const existingExpense =
+        expenses.find(
+          (expense) => expense.id === id
+        );
 
-      const expenseToUpdate = { ...existingExpense, ...updatedExpense };
-      let updatedData: Expense | null = null;
+      if (!existingExpense) {
+        return;
+      }
+
+      const expenseToUpdate = {
+        ...existingExpense,
+        ...updatedExpense,
+      };
+
+      let updatedData: Expense | null =
+        null;
 
       try {
         const headers = await getAuthHeaders();
-        const response = await fetch(`${API_URL}/${id}`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({
-            amount: expenseToUpdate.amount,
-            category: expenseToUpdate.category,
-            merchant: expenseToUpdate.merchant,
-            note: expenseToUpdate.note,
-            date: expenseToUpdate.date,
-          }),
-        });
+
+        const response = await fetch(
+          `${API_URL}/${id}`,
+          {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({
+              amount:
+                expenseToUpdate.amount,
+              category:
+                expenseToUpdate.category,
+              merchant:
+                expenseToUpdate.merchant,
+              note:
+                expenseToUpdate.note,
+              date:
+                expenseToUpdate.date,
+            }),
+          }
+        );
 
         if (response.ok) {
           const data = await response.json();
           updatedData = data.expense;
         }
       } catch (backendErr) {
-        console.warn("Backend API edit error, trying Supabase direct update:", backendErr);
+        console.warn(
+          "Backend API edit error, trying Supabase direct update:",
+          backendErr
+        );
       }
 
-      if (!updatedData && user) {
-        const { data, error } = await supabase
-          .from("expenses")
-          .update({
-            amount: expenseToUpdate.amount,
-            category: expenseToUpdate.category,
-            merchant: expenseToUpdate.merchant,
-            note: expenseToUpdate.note,
-            date: expenseToUpdate.date,
-          })
-          .eq("id", id)
-          .eq("user_id", user.id)
-          .select()
-          .maybeSingle();
+      /*
+      |--------------------------------------------------------------------------
+      | Supabase fallback
+      |--------------------------------------------------------------------------
+      */
 
-        if (error) throw error;
+      if (!updatedData && user) {
+        const { data, error } =
+          await supabase
+            .from("expenses")
+            .update({
+              amount:
+                expenseToUpdate.amount,
+              category:
+                expenseToUpdate.category,
+              merchant:
+                expenseToUpdate.merchant,
+              note:
+                expenseToUpdate.note,
+              date:
+                expenseToUpdate.date,
+            })
+            .eq("id", id)
+            .eq("user_id", user.id)
+            .select()
+            .maybeSingle();
+
+        if (error) {
+          throw error;
+        }
+
         updatedData = data;
       }
 
       if (updatedData) {
-        setExpenses((currentExpenses) =>
-          currentExpenses.map((expense) =>
-            expense.id === id ? updatedData! : expense
-          )
+        setExpenses(
+          (currentExpenses) =>
+            currentExpenses.map(
+              (expense) =>
+                expense.id === id
+                  ? updatedData!
+                  : expense
+            )
         );
       }
     } catch (error) {
-      console.error("Failed to update expense:", error);
+      console.error(
+        "Failed to update expense:",
+        error
+      );
     }
   };
 
@@ -348,8 +483,8 @@ function App() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f7f7f5]">
-        <p className="text-sm text-gray-500">
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f7f5] px-4">
+        <p className="text-sm text-gray-500 text-center">
           Checking authentication...
         </p>
       </div>
@@ -365,9 +500,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* Login */}
-
         <Route
           path="/login"
           element={
@@ -383,32 +516,33 @@ function App() {
         />
 
         {/* Reset Password */}
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
 
         {/* Protected application */}
-
         <Route
           path="*"
           element={
             user ? (
-              <div className="min-h-screen flex flex-col md:flex-row bg-[#f7f7f5] overflow-x-hidden">
-
+              <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#f7f7f5] overflow-x-hidden">
+                {/* Mobile Header */}
                 <MobileHeader />
 
+                {/* Desktop Sidebar */}
                 <Sidebar />
 
-                <main className="flex-1 min-w-0 pb-20 md:pb-0 overflow-x-hidden">
-
+                {/* Main Content Area */}
+                <div className="flex-1 min-w-0 w-full overflow-x-hidden pb-20 lg:pb-0">
                   <Routes>
-
                     {/* Dashboard */}
-
                     <Route
                       path="/"
                       element={
                         loading ? (
-                          <div className="flex-1 min-h-screen flex items-center justify-center">
-                            <p className="text-sm text-gray-500">
+                          <div className="min-h-[calc(100vh-64px)] lg:min-h-screen flex items-center justify-center px-4">
+                            <p className="text-sm text-gray-500 text-center">
                               Loading expenses...
                             </p>
                           </div>
@@ -424,13 +558,12 @@ function App() {
                     />
 
                     {/* Expenses */}
-
                     <Route
                       path="/expenses"
                       element={
                         loading ? (
-                          <div className="flex-1 min-h-screen flex items-center justify-center">
-                            <p className="text-sm text-gray-500">
+                          <div className="min-h-[calc(100vh-64px)] lg:min-h-screen flex items-center justify-center px-4">
+                            <p className="text-sm text-gray-500 text-center">
                               Loading expenses...
                             </p>
                           </div>
@@ -449,7 +582,6 @@ function App() {
                     />
 
                     {/* Insights */}
-
                     <Route
                       path="/insights"
                       element={
@@ -458,13 +590,11 @@ function App() {
                         />
                       }
                     />
-
                   </Routes>
+                </div>
 
-                </main>
-
+                {/* Mobile Bottom Navigation */}
                 <MobileNav />
-
               </div>
             ) : (
               <Navigate
@@ -474,7 +604,6 @@ function App() {
             )
           }
         />
-
       </Routes>
     </BrowserRouter>
   );
